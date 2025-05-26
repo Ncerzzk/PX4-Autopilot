@@ -46,7 +46,7 @@ static inline constexpr px4_spi_bus_device_t initSPIDevice(uint8_t devid_driver,
 	return ret;
 }
 
-static inline constexpr px4_spi_bus_t initSPIBus(int bus, const px4_spi_bus_devices_t &devices)
+static inline constexpr px4_spi_bus_t initSPIBus(int bus, const px4_spi_bus_devices_t &devices, bool is_external = false)
 {
 	px4_spi_bus_t ret{};
 
@@ -55,7 +55,7 @@ static inline constexpr px4_spi_bus_t initSPIBus(int bus, const px4_spi_bus_devi
 	}
 
 	ret.bus = bus;
-	ret.is_external = false; // all buses are marked internal on Linux
+	ret.is_external = is_external;
 	ret.requires_locking = false;
 	return ret;
 }
