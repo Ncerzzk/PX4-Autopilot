@@ -43,14 +43,17 @@
 
 #include <limits.h>
 
-class SC7U22_IIO final : public ModuleBase<SC7U22_IIO>
+class SC7U22_IIO final : public ModuleBase
 {
 public:
+	static Descriptor desc;
+
 	SC7U22_IIO(const char *device_path, enum Rotation rotation, uint8_t bus, uint8_t chip_select);
 	~SC7U22_IIO() override;
 
 	static int task_spawn(int argc, char *argv[]);
 	static SC7U22_IIO *instantiate(int argc, char *argv[]);
+	static int run_trampoline(int argc, char *argv[]);
 	static int custom_command(int argc, char *argv[]);
 	static int print_usage(const char *reason = nullptr);
 

@@ -8,11 +8,14 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+
+ModuleBase::Descriptor FlexbusDShot::desc{task_spawn, custom_command, print_usage};
 
 namespace
 {
@@ -153,8 +156,8 @@ int FlexbusDShot::task_spawn(int argc, char *argv[])
 		return PX4_ERROR;
 	}
 
-	_object.store(instance);
-	_task_id = task_id_is_work_queue;
+	desc.object.store(instance);
+	desc.task_id = task_id_is_work_queue;
 	instance->ScheduleNow();
 
 	return PX4_OK;
@@ -195,7 +198,7 @@ bool FlexbusDShot::send_frame(const rk_dshot_frame &frame)
 	return true;
 }
 
-bool FlexbusDShot::updateOutputs(uint16_t outputs[MAX_ACTUATORS],
+bool FlexbusDShot::updateOutputs(float outputs[MAX_ACTUATORS],
 				 unsigned num_outputs, unsigned num_control_groups_updated)
 {
 	(void)num_control_groups_updated;
@@ -207,7 +210,8 @@ bool FlexbusDShot::updateOutputs(uint16_t outputs[MAX_ACTUATORS],
 		uint16_t value = DSHOT_DISARM_VALUE;
 
 		if (i < num_outputs) {
-			const uint16_t output = math::min(outputs[i], DSHOT_MAX_THROTTLE);
+			const uint16_t output = static_cast<uint16_t>(lroundf(math::constrain(outputs[i],
+						0.f, static_cast<float>(DSHOT_MAX_THROTTLE))));
 
 			// MixingOutput uses the same 0..1999 throttle range as the standard PX4
 			// DShot driver. Values 0..47 are reserved for DShot commands, so add the
@@ -238,7 +242,7 @@ bool FlexbusDShot::updateOutputs(uint16_t outputs[MAX_ACTUATORS],
 
 			// Persist the setting after the requested command burst.
 			if (_current_command.num_repetitions == 0 && _current_command.save) {
-				_current_command.command = DShot_cmd_save_settings;
+				_current_command.command = DSHOT_CMD_SAVE_SETTINGS;
 				_current_command.num_repetitions = 10;
 				_current_command.save = false;
 			}
@@ -274,7 +278,6 @@ void FlexbusDShot::publish_esc_status()
 		}
 
 		esc_report_s &esc = esc_status.esc[telemetry_index];
-		esc.esc_address = telemetry_index + 1;
 		esc.actuator_function = static_cast<uint8_t>(_mixing_output.outputFunction(channel));
 		esc.esc_errorcount = _last_telemetry.error_count[channel];
 
@@ -307,7 +310,7 @@ int FlexbusDShot::send_dshot_cmd(uint16_t cmd, int dshot_channel_mask)
 	return send_frame(frame) ? PX4_OK : PX4_ERROR;
 }
 
-int FlexbusDShot::enqueue_command(dshot_command_t command, int num_repetitions, uint8_t motor_mask, bool save)
+int FlexbusDShot::enqueue_command(uint16_t command, int num_repetitions, uint8_t motor_mask, bool save)
 {
 	Command queued_command{};
 	queued_command.command = command;
@@ -368,7 +371,7 @@ void FlexbusDShot::Run()
 	if (should_exit()) {
 		ScheduleClear();
 		_mixing_output.unregister();
-		exit_and_cleanup();
+		exit_and_cleanup(desc);
 		return;
 	}
 
@@ -476,17 +479,17 @@ void FlexbusDShot::handle_vehicle_commands()
 		command_ack.result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_UNSUPPORTED;
 
 		if (index != -1) {
-			dshot_command_t command = DShot_cmd_motor_stop;
+			uint16_t command = DSHOT_CMD_MOTOR_STOP;
 
 			switch (type) {
-			case 1: command = DShot_cmd_beacon1; break;
-			case 2: command = DShot_cmd_3d_mode_on; break;
-			case 3: command = DShot_cmd_3d_mode_off; break;
-			case 4: command = DShot_cmd_spin_direction_1; break;
-			case 5: command = DShot_cmd_spin_direction_2; break;
+			case 1: command = DSHOT_CMD_BEEP1; break;
+			case 2: command = DSHOT_CMD_3D_MODE_ON; break;
+			case 3: command = DSHOT_CMD_3D_MODE_OFF; break;
+			case 4: command = DSHOT_CMD_SPIN_DIRECTION_1; break;
+			case 5: command = DSHOT_CMD_SPIN_DIRECTION_2; break;
 			}
 
-			if (command == DShot_cmd_motor_stop) {
+			if (command == DSHOT_CMD_MOTOR_STOP) {
 				PX4_WARN("unknown actuator configuration command: %i", type);
 
 			} else {
@@ -513,7 +516,7 @@ int FlexbusDShot::custom_command(int argc, char *argv[])
 		return print_usage("unknown command");
 	}
 
-	if (!is_running()) {
+	if (!is_running(desc)) {
 		PX4_ERR("not running");
 		return PX4_ERROR;
 	}
@@ -564,14 +567,14 @@ int FlexbusDShot::custom_command(int argc, char *argv[])
 		}
 	}
 
-	FlexbusDShot *instance = _object.load();
+	FlexbusDShot *instance = get_instance<FlexbusDShot>(desc);
 
 	if (instance == nullptr) {
 		PX4_ERR("instance not found");
 		return PX4_ERROR;
 	}
 
-	const int ret = instance->enqueue_command(static_cast<dshot_command_t>(cmd), repeat_cnt,
+	const int ret = instance->enqueue_command(static_cast<uint16_t>(cmd), repeat_cnt,
 			1u << motor_index, false);
 
 	if (ret == PX4_OK) {
@@ -643,5 +646,5 @@ Drive DShot outputs through the Rockchip flexbus DShot kernel driver.
 
 extern "C" __EXPORT int flexbus_dshot_main(int argc, char *argv[])
 {
-	return FlexbusDShot::main(argc, argv);
+	return ModuleBase::main(FlexbusDShot::desc, argc, argv);
 }

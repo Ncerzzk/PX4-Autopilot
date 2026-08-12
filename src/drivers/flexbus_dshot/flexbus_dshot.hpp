@@ -20,14 +20,16 @@
 
 using namespace time_literals;
 
-class FlexbusDShot final : public ModuleBase<FlexbusDShot>, public OutputModuleInterface
+class FlexbusDShot final : public ModuleBase, public OutputModuleInterface
 {
 public:
+	static Descriptor desc;
+
 	static constexpr unsigned DSHOT_CHANNELS = 4;
 	static constexpr uint16_t DSHOT_DISARM_VALUE = 0;
 	static constexpr uint16_t DSHOT_MIN_THROTTLE = 1;
 	static constexpr uint16_t DSHOT_MAX_THROTTLE = 1999;
-	static constexpr uint16_t DSHOT_COMMAND_OFFSET = DShot_cmd_MIN_throttle;
+	static constexpr uint16_t DSHOT_COMMAND_OFFSET = DSHOT_CMD_MIN_THROTTLE;
 	static constexpr uint32_t DSHOT_DEFAULT_RATE = 300000;
 	static constexpr hrt_abstime ESC_INIT_DURATION = 1200_ms;
 	static constexpr hrt_abstime ESC_INIT_INTERVAL = 2_ms;
@@ -43,7 +45,7 @@ public:
 
 	int print_status() override;
 
-	bool updateOutputs(uint16_t outputs[MAX_ACTUATORS],
+	bool updateOutputs(float outputs[MAX_ACTUATORS],
 			   unsigned num_outputs, unsigned num_control_groups_updated) override;
 
 private:
@@ -69,7 +71,7 @@ private:
 	static_assert(sizeof(rk_dshot_telemetry_xfer) == 68, "unexpected Flexbus DShot telemetry transfer ABI size");
 
 	struct Command {
-		dshot_command_t command{DShot_cmd_motor_stop};
+		uint16_t command{DSHOT_CMD_MOTOR_STOP};
 		int num_repetitions{0};
 		uint8_t motor_mask{0};
 		bool save{false};
@@ -82,7 +84,7 @@ private:
 	static int open_device(const char *device_name, uint32_t rate_hz, bool telemetry);
 	bool send_frame(const rk_dshot_frame &frame);
 	int send_dshot_cmd(uint16_t cmd, int dshot_channel_mask);
-	int enqueue_command(dshot_command_t command, int num_repetitions, uint8_t motor_mask, bool save);
+	int enqueue_command(uint16_t command, int num_repetitions, uint8_t motor_mask, bool save);
 	bool dequeue_command(Command &command);
 	void clear_command_queue();
 	void handle_vehicle_commands();

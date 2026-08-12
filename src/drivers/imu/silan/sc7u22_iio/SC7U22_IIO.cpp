@@ -50,6 +50,8 @@
 
 using namespace time_literals;
 
+ModuleBase::Descriptor SC7U22_IIO::desc{task_spawn, custom_command, print_usage};
+
 namespace
 {
 constexpr const char *IIO_SYSFS_ROOT = "/sys/bus/iio/devices";
@@ -544,22 +546,29 @@ int SC7U22_IIO::print_status()
 	return 0;
 }
 
+int SC7U22_IIO::run_trampoline(int argc, char *argv[])
+{
+	return ModuleBase::run_trampoline_impl(desc, [](int ac, char *av[]) -> ModuleBase * {
+		return SC7U22_IIO::instantiate(ac, av);
+	}, argc, argv);
+}
+
 int SC7U22_IIO::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd(MODULE_NAME,
+	desc.task_id = px4_task_spawn_cmd(MODULE_NAME,
 				      SCHED_DEFAULT,
 				      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
 				      3000,
 				      (px4_main_t)&run_trampoline,
 				      (char *const *)argv);
 
-	if (_task_id < 0) {
-		_task_id = -1;
+	if (desc.task_id < 0) {
+		desc.task_id = -1;
 		return -errno;
 	}
 
-	if (wait_until_running() != PX4_OK) {
-		_task_id = -1;
+	if (wait_until_running(desc) != PX4_OK) {
+		desc.task_id = -1;
 		return PX4_ERROR;
 	}
 
@@ -655,5 +664,5 @@ The Linux kernel driver must own the SPI device. Do not start the legacy
 
 extern "C" __EXPORT int sc7u22_iio_main(int argc, char *argv[])
 {
-	return SC7U22_IIO::main(argc, argv);
+	return ModuleBase::main(SC7U22_IIO::desc, argc, argv);
 }
