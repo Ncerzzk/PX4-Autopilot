@@ -425,8 +425,8 @@ bool SC7U22_IIO::process_scan(const uint8_t *scan)
 	if (_last_timestamp_us != 0) {
 		const int64_t delta_us = static_cast<int64_t>(timestamp_us) - static_cast<int64_t>(_last_timestamp_us);
 
-		if (delta_us < static_cast<int64_t>(SAMPLE_INTERVAL_US - 100)
-		    || delta_us > static_cast<int64_t>(SAMPLE_INTERVAL_US + 100)) {
+		if (delta_us < static_cast<int64_t>(SAMPLE_INTERVAL_US - SAMPLE_INTERVAL_TOLERANCE_US)
+		    || delta_us > static_cast<int64_t>(SAMPLE_INTERVAL_US + SAMPLE_INTERVAL_TOLERANCE_US)) {
 			perf_count(_timestamp_gap_perf);
 			reset_pending();
 		}

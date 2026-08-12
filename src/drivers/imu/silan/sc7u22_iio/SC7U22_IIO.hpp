@@ -64,6 +64,7 @@ public:
 private:
 	static constexpr uint32_t SAMPLE_RATE_HZ{1600};
 	static constexpr uint32_t SAMPLE_INTERVAL_US{1000000 / SAMPLE_RATE_HZ};
+	static constexpr uint32_t SAMPLE_INTERVAL_TOLERANCE_US{300};
 	static constexpr uint8_t SAMPLES_PER_PUBLISH{2};
 	static constexpr size_t IIO_SCAN_SIZE{24};
 	static constexpr size_t IIO_TIMESTAMP_OFFSET{16};
